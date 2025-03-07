@@ -1,4 +1,5 @@
 import { auth,db } from './firebase.js';
+import { sendPasswordResetEmail } from "firebase/auth";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, setDoc } from 'firebase/firestore';
 
@@ -61,6 +62,16 @@ export const loginUser = async (email, password) => {
             throw new Error(error.message);
             
         }
+    }
+};
+
+export const RecoveryPassword = async (email) => {
+    try {
+        await sendPasswordResetEmail(auth, email);
+        return "Correo enviado con éxito.";
+    } catch (error) {
+        console.error("Error al recuperar contraseña:", error.message);
+        throw new Error(error.message);
     }
 };
 

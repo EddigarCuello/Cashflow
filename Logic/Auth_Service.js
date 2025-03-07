@@ -1,6 +1,7 @@
 import { registerUser } from "../Data/Auth.js";
 import { findUserBy } from "../Data/PersonaData.js";
-import { loginUser, logoutUser } from "../Data/Auth.js";
+import { loginUser, logoutUser , RecoveryPassword} from "../Data/Auth.js";
+
 
 export const registro = async (Persona) => {
   try {
@@ -34,6 +35,24 @@ export const login = async (email, password) => {
   } catch (error) {
     console.error("Error en el inicio de sesión:", error.message);
     return null;
+  }
+};
+
+export const emailRecuperacion = async (cedula) => {
+  try {
+      const userData = await findUserBy("cedula", cedula);
+      
+      if (userData && userData.email) {
+          await RecoveryPassword(userData.email);
+          console.log("Correo de recuperación enviado a:", userData.email);
+          return "Correo de recuperación enviado con éxito.";
+      } else {
+          console.log("No se encontró un usuario con la cédula proporcionada.");
+          return "No se encontró un usuario con esa cédula.";
+      }
+  } catch (error) {
+      console.error("Error en emailRecuperacion:", error.message);
+      return "Hubo un error al procesar la recuperación.";
   }
 };
 
