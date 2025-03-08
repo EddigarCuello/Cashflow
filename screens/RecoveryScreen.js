@@ -2,18 +2,21 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Button from '../components/Button';
+import { emailRecuperacion } from '../Logic/Auth_Service';
 
 const RecoveryScreen = ({ navigation }) => {
   const [cedula, setCedula] = useState('');
 
-  const handleRecovery = () => {
+  const handleRecovery = async() => {
     if (!cedula) {
       Alert.alert("Error", "Por favor, ingresa tu cédula.");
       return;
     }
-
-    Alert.alert("Éxito", `Se enviará un código de recuperación al correo asociado a la cédula: ${cedula}`);
-    console.log("Cédula ingresada:", cedula);
+    const recoveryPassword = await emailRecuperacion(cedula);
+    //Alert.alert("Éxito", `Se enviará un código de recuperación al correo asociado a la cédula: ${cedula}`);
+    Alert.alert("Éxito ", recoveryPassword);
+    console.log("Cédula ingresada:", cedula, "\n");
+    console.log(recoveryPassword);
   };
 
   return (

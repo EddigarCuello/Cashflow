@@ -3,7 +3,7 @@ import { View, StyleSheet, Alert, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
-import { login } from '../Logic/Auth_Service';
+import { login, loginWithCedula } from '../Logic/Auth_Service';
 
 const LoginScreen = ({ navigation }) => {
   const [correo, setCorreo] = useState('');
@@ -16,7 +16,7 @@ const LoginScreen = ({ navigation }) => {
     }
 
     try {
-      const userData = await login(correo, contraseña);
+      const userData = await loginWithCedula(correo, contraseña);
 
       if (userData) {
         Alert.alert("Éxito", "Inicio de sesión exitoso.");
@@ -41,7 +41,7 @@ const LoginScreen = ({ navigation }) => {
       />
       <View style={styles.inputContainer}>
         <InputField 
-          label="Correo" 
+          label="Cedula" 
           placeholder="Ingresa tu Correo" 
           keyboardType="email-address"
           value={correo}

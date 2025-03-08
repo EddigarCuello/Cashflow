@@ -15,6 +15,7 @@ export const registro = async (Persona) => {
 
 export const login = async (email, password) => {
   try {
+    
     // Autenticar al usuario
     const user = await loginUser(email, password);
     if (!user) {
@@ -38,9 +39,37 @@ export const login = async (email, password) => {
   }
 };
 
-export const emailRecuperacion = async (cedula) => {
+export const loginWithCedula = async (cedula, password) => {
   try {
-      const userData = await findUserBy("cedula", cedula);
+    const UserdData = await findUserBy("cedula",cedula);
+    // Autenticar al usuario
+    const user = await loginUser(UserdData.email, password);
+    if (!user) {
+      // Si el usuario no existe o las credenciales son incorrectas, lanzar un error o devolver null
+      throw new Error("Credenciales incorrectas");
+    }
+    
+    // Obtener los datos del usuario por email
+    const userData = await findUserBy("email", UserdData.email);
+    if (userData) {
+      
+      console.log("Usuario ha iniciado sesión:", user);
+      return userData;
+    } else {
+      console.error("Datos del usuario no encontrados.");
+      return null;
+    }
+  } catch (error) {
+    console.error("Error en el inicio de sesión:", error.message);
+    return null;
+  }
+};
+
+export const emailRecuperacion = async (cedula) => {
+  console.log("llamando a recuperacion de contraseña");
+  try {
+      const userData = await findUserBy("cedula",cedula);
+
       
       if (userData && userData.email) {
           await RecoveryPassword(userData.email);
