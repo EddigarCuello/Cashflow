@@ -1,28 +1,28 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Header from '../components/Header';
 import Button from '../components/Button';
 import AuthFooter from '../components/AuthFooter';
-import RegisterScreen from './RegisterScreen';
-import LoginScreen from './LoginScreen';
+import { useNavigation } from '@react-navigation/native'; // Importa useNavigation
 
 const AuthScreen = () => {
-  const [screen, setScreen] = useState('auth');
+  const navigation = useNavigation(); // Obtén el objeto de navegación
 
   return (
     <View style={styles.container}>
-      {screen === 'auth' && <Header />}
-      {screen === 'register' ? (
-        <RegisterScreen />
-      ) : screen === 'login' ? (
-        <LoginScreen />
-      ) : (
-        <View style={styles.authContainer}>
-          <Button title="Sign up" filled onPress={() => setScreen('register')} />
-          <Button title="Log in" onPress={() => setScreen('login')} />
-          <AuthFooter />
-        </View>
-      )}
+      <Header />
+      <View style={styles.authContainer}>
+        <Button
+          title="Sign up"
+          filled
+          onPress={() => navigation.navigate('RegisterScreen')} // Navega a RegisterScreen
+        />
+        <Button
+          title="Log in"
+          onPress={() => navigation.navigate('LoginScreen')} // Navega a LoginScreen
+        />
+        <AuthFooter />
+      </View>
     </View>
   );
 };

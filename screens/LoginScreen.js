@@ -1,59 +1,71 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, Text, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
+import { login } from '../Logic/Auth_Service';
 
-const LoginScreen = () => {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [idNumber, setIdNumber] = useState('');
-  const [pin, setPin] = useState('');
+const LoginScreen = ({ navigation }) => {
+  const [correo, setCorreo] = useState('');
+  const [contraseña, setContraseña] = useState('');
 
-  const handleLogin = () => {
-    if (!phoneNumber || !idNumber || !pin) {
-      Alert.alert('Error', 'Todos los campos son obligatorios');
+  const handleLogin = async () => {
+    if (!correo || !contraseña) {
+      Alert.alert("Error", "Por favor, completa todos los campos.");
       return;
     }
 
-    if (phoneNumber.length < 10 || idNumber.length < 5 || pin.length < 4) {
-      Alert.alert('Error', 'Verifica los datos ingresados');
-      return;
-    }
+    try {
+      const userData = await login(correo, contraseña);
 
-    Alert.alert('Éxito', 'Inicio de sesión exitoso');
+      if (userData) {
+        Alert.alert("Éxito", "Inicio de sesión exitoso.");
+        console.log("Datos del usuario:", userData);
+      } else {
+        Alert.alert("Error", "Credenciales incorrectas.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Hubo un problema al iniciar sesión. Inténtalo de nuevo.");
+      console.error("Error en el inicio de sesión:", error.message);
+    }
   };
 
   return (
     <View style={styles.container}>
+      <Ionicons 
+        name="arrow-back" 
+        size={30} 
+        color="white" 
+        style={styles.backButton} 
+        onPress={() => navigation.navigate('AuthScreen')} 
+      />
       <View style={styles.inputContainer}>
         <InputField 
-          label="Número de teléfono" 
-          placeholder="Ingresa tu número de teléfono" 
-          keyboardType="phone-pad"
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
+          label="Correo" 
+          placeholder="Ingresa tu Correo" 
+          keyboardType="email-address"
+          value={correo}
+          onChangeText={setCorreo}
         />
 
         <InputField 
-          label="Número de identificación" 
-          placeholder="Ingresa tu cédula" 
-          keyboardType="numeric"
-          value={idNumber}
-          onChangeText={setIdNumber}
-        />
-
-        <InputField 
-          label="PIN" 
-          placeholder="Ingresa tu PIN" 
-          keyboardType="numeric"
+          label="Contraseña" 
+          placeholder="Ingresa tu contraseña" 
+          keyboardType="default"
           secureTextEntry
-          value={pin}
-          onChangeText={setPin}
+          value={contraseña}
+          onChangeText={setContraseña}
         />
       </View>
 
       <View style={styles.buttonContainer}>
         <Button title="Iniciar sesión" filled onPress={handleLogin} style={styles.loginButton} />
       </View>
+
+      {/* Texto "Recuperar cuenta" */}
+      <TouchableOpacity onPress={() => navigation.navigate('RecoveryScreen')}>
+        <Text style={styles.recoveryText}>Recuperar cuenta</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -65,27 +77,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
-    
+  },
+  backButton: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
   },
   inputContainer: {
     width: '100%',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    width: '100%', 
+    alignItems: 'center',
+    marginBottom: 20, 
   },
   buttonContainer: {
     width: '100%',
     alignItems: 'center',
-    marginTop: 20,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    width: '100%',
+    marginBottom: 20, // Espacio adicional para el texto de recuperación
   },
   loginButton: {
     width: '90%',
     paddingVertical: 15,
+  },
+  recoveryText: {
+    color: '#fff', // Color blanco para que coincida con el tema oscuro
+    fontSize: 16,
+    textDecorationLine: 'underline', // Subrayado para que parezca un enlace
   },
 });
 
