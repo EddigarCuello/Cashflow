@@ -21,6 +21,7 @@ const LoginScreen = ({ navigation }) => {
       if (userData) {
         Alert.alert("Éxito", "Inicio de sesión exitoso.");
         console.log("Datos del usuario:", userData);
+        navigation.navigate('HomeScreen'); // Redirige al HomeScreen después del login exitoso
       } else {
         Alert.alert("Error", "Credenciales incorrectas.");
       }
