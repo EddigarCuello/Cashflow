@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 
 const TasaDeInteres = () => {
-    const [formula, setFormula] = useState('general');
     const [vp, setVp] = useState('');
     const [tasa, setTasa] = useState('');
     const [tiempo, setTiempo] = useState('');
+    const [interes, setInteres] = useState('');
+    const [monto, setMonto] = useState('');
     const [vf, setVf] = useState('');
     const [resultado, setResultado] = useState('');
 
     const calcularInteres = () => {
-        if (!vp || !tasa || !tiempo || !vf) {
+        if (!vp || !tasa || !tiempo) {
             alert('Por favor, completa todos los campos.');
             return;
         }
@@ -19,117 +19,69 @@ const TasaDeInteres = () => {
         const vpNum = parseFloat(vp);
         const tasaNum = parseFloat(tasa);
         const tiempoNum = parseFloat(tiempo);
-        const vfNum = parseFloat(vf);
 
-        if (formula === 'general') {
-            const interes = vpNum * tasaNum * tiempoNum;
-            setResultado(`Interés Simple: $${interes.toFixed(2)}`);
-        } else if (formula === 'vp') {
-            const vpCalculado = vfNum / (1 + tasaNum * tiempoNum);
-            setResultado(`Valor Presente: $${vpCalculado.toFixed(2)}`);
-        } else if (formula === 'tiempo') {
-            const tiempoCalculado = (vfNum - vpNum) / (vpNum * tasaNum);
-            setResultado(`Tiempo: ${tiempoCalculado.toFixed(2)} años`);
-        }
+        const interesCalculado = vpNum * tasaNum * tiempoNum;
+        const montoCalculado = vpNum + interesCalculado;
+
+        setInteres(interesCalculado.toFixed(2));
+        setMonto(montoCalculado.toFixed(2));
+        setResultado(`Interés Simple: $${interesCalculado.toFixed(2)}\nMonto Total: $${montoCalculado.toFixed(2)}`);
     };
 
     return (
         <View style={styles.container}>
             <Text style={styles.titulo}>Interés Simple</Text>
-            
-            <Picker
-                selectedValue={formula}
-                style={styles.picker}
-                onValueChange={(itemValue) => setFormula(itemValue)}
-            >
-                <Picker.Item label="Fórmula general del interés simple" value="general" />
-                <Picker.Item label="Cálculo del Valor Presente (VP)" value="vp" />
-                <Picker.Item label="Cálculo del tiempo (t)" value="tiempo" />
-            </Picker>
+            <Text style={styles.descripcion}>
+                El interés simple es una forma de calcular el rendimiento de una inversión o el costo de un préstamo
+                sin considerar la acumulación de intereses en periodos anteriores.
+            </Text>
 
-            {formula === 'general' && (
-                <>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Valor Presente (VP)"
-                        keyboardType="numeric"
-                        value={vp}
-                        onChangeText={setVp}
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Tasa de interés (r)"
-                        keyboardType="numeric"
-                        value={tasa}
-                        onChangeText={setTasa}
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Tiempo (t)"
-                        keyboardType="numeric"
-                        value={tiempo}
-                        onChangeText={setTiempo}
-                    />
-                </>
-            )}
-
-            {formula === 'vp' && (
-                <>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Valor Futuro (VF)"
-                        keyboardType="numeric"
-                        value={vf}
-                        onChangeText={setVf}
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Tasa de interés (r)"
-                        keyboardType="numeric"
-                        value={tasa}
-                        onChangeText={setTasa}
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Tiempo (t)"
-                        keyboardType="numeric"
-                        value={tiempo}
-                        onChangeText={setTiempo}
-                    />
-                </>
-            )}
-
-            {formula === 'tiempo' && (
-                <>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Valor Presente (VP)"
-                        keyboardType="numeric"
-                        value={vp}
-                        onChangeText={setVp}
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Valor Futuro (VF)"
-                        keyboardType="numeric"
-                        value={vf}
-                        onChangeText={setVf}
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Tasa de interés (r)"
-                        keyboardType="numeric"
-                        value={tasa}
-                        onChangeText={setTasa}
-                    />
-                </>
-            )}
+            <TextInput
+                style={styles.input}
+                placeholder="Capital (P)"
+                keyboardType="numeric"
+                value={vp}
+                onChangeText={setVp}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Tasa de interés (r)"
+                keyboardType="numeric"
+                value={tasa}
+                onChangeText={setTasa}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Tiempo (t)"
+                keyboardType="numeric"
+                value={tiempo}
+                onChangeText={setTiempo}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Interés (I)"
+                keyboardType="numeric"
+                value={interes}
+                onChangeText={setInteres}
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Monto Total (M)"
+                keyboardType="numeric"
+                value={monto}
+                onChangeText={setMonto}
+            />
 
             <TouchableOpacity style={styles.boton} onPress={calcularInteres}>
                 <Text style={styles.textoBoton}>Calcular</Text>
             </TouchableOpacity>
 
-            {resultado ? <Text style={styles.resultado}>{resultado}</Text> : null}
+            {resultado ? (
+                <View>
+                    <Text style={styles.resultado}>Interés (I): ${interes}</Text>
+                    <Text style={styles.resultado}>Monto Total (M): ${monto}</Text>
+                </View>
+            ) : null}
         </View>
     );
 };
@@ -144,15 +96,13 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: 'bold',
         color: '#FFF',
-        marginBottom: 20,
+        marginBottom: 10,
         textAlign: 'center',
     },
-    picker: {
-        height: 50,
-        width: '100%',
-        color: '#FFF',
-        backgroundColor: '#2A2D3E',
-        borderRadius: 10,
+    descripcion: {
+        fontSize: 16,
+        color: '#BBB',
+        textAlign: 'center',
         marginBottom: 20,
     },
     input: {
