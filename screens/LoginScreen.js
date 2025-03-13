@@ -43,7 +43,7 @@ const LoginScreen = ({ navigation }) => {
       <View style={styles.inputContainer}>
         <InputField 
           label="Cedula" 
-          placeholder="Ingresa tu Correo" 
+          placeholder="Ingresa tu Cedula" 
           keyboardType="email-address"
           value={correo}
           onChangeText={setCorreo}
