@@ -5,7 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Image
+  Image,
+  TextInput
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native"; // Importa useNavigation
@@ -49,96 +50,114 @@ const transactions = [
   { id: "7", name: "Bills", amount: "-$800", color: "#E55B42", icon: "receipt" }
 ];
 
+const menuButtons = [
+  {
+    id: "1",
+    name: "Tasa de Interés",
+    icon: "trending-up",
+    onPress: () => navigation.navigate("TasaDeInteres")
+  },
+  {
+    id: "2",
+    name: "I. Simple",
+    icon: "calculator",
+    onPress: () => navigation.navigate("TasaDeInteres")
+  },
+  {
+    id: "3",
+    name: "I. Compuesto",
+    icon: "bar-chart",
+    onPress: () => navigation.navigate("InteresCompuesto")
+  },
+  {
+    id: "4",
+    name: "Anualidades",
+    icon: "calendar",
+    onPress: () => navigation.navigate("Anualidades")
+  }
+];
+
 const HomeScreen = () => {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const navigation = useNavigation(); // Obtén el objeto de navegación
+
+  // Filtrar transacciones según el texto de búsqueda
+  const filteredTransactions = transactions.filter((transaction) =>
+    transaction.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={require("../assets/fondo.jpg")}
-          style={styles.backgroundImage}
-        />
-        <Text style={styles.currency}>COP pesos</Text>
-        <Text style={styles.balance}>$20,000</Text>
-      </View>
-
-      <View style={styles.menuContainer}>
-        <TouchableOpacity style={styles.menuButton}>
-          <Ionicons name="trending-up" size={24} color="#E5A442" />
-          <Text style={styles.menuText}>Tasa de Interés</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation.navigate("TasaDeInteres")} // Navega a TasaDeInteres
-        >
-          <Ionicons name="calculator" size={24} color="#E5A442" />
-          <Text style={styles.menuText}>I. Simple</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => setShowMoreOptions(!showMoreOptions)}
-        >
-          <Ionicons
-            name={showMoreOptions ? "close" : "ellipsis-horizontal"}
-            size={24}
-            color="#E5A442"
+      {/* Ocultar el header cuando activeIndex es 1 (person-outline) */}
+      {activeIndex !== 1 && (
+        <View style={styles.header}>
+          <Image
+            source={require("../assets/fondo.jpg")}
+            style={styles.backgroundImage}
           />
-          <Text style={styles.menuText}>Más</Text>
-        </TouchableOpacity>
-      </View>
+          <Text style={styles.currency}>COP pesos</Text>
+          <Text style={styles.balance}>$20,000</Text>
+        </View>
+      )}
 
-      {showMoreOptions &&
-        <View style={styles.extraMenuContainer}>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => navigation.navigate("InteresCompuesto")} // Navega a Interés Compuesto
-          >
-            <Ionicons name="bar-chart" size={24} color="#E5A442" />
-            <Text style={styles.menuText}>I. Compuesto</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => navigation.navigate("Anualidades")} // Navega a Anualidades
-          >
-            <Ionicons name="calendar" size={24} color="#E5A442" />
-            <Text style={styles.menuText}>Anualidades</Text>
-          </TouchableOpacity>
-        </View>}
-
-      <View style={styles.transactionContainer}>
-        <Text style={styles.transactionTitle}>Transaction</Text>
+      {/* Ocultar los botones del menú cuando activeIndex es 1 (person-outline) */}
+      {activeIndex !== 1 && (
         <FlatList
-          data={transactions}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) =>
-            <View
-              style={[styles.transactionItem, { borderLeftColor: item.color }]}
-            >
-              <Ionicons
-                name={item.icon}
-                size={24}
-                color={item.color}
-                style={styles.icon}
-              />
-              <Text style={styles.transactionText}>
-                {item.name}
-              </Text>
-              <Text
-                style={[
-                  styles.transactionAmount,
-                  { color: item.amount.includes("-") ? "red" : "green" }
-                ]}
-              >
-                {item.amount}
-              </Text>
-            </View>}
+          data={menuButtons}
+          keyExtractor={(item) => item.id}
+          numColumns={2} // Grilla de 2 columnas
+          contentContainerStyle={styles.menuContainer}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.menuButton} onPress={item.onPress}>
+              <Ionicons name={item.icon} size={24} color="#E5A442" />
+              <Text style={styles.menuText}>{item.name}</Text>
+            </TouchableOpacity>
+          )}
         />
-      </View>
+      )}
 
+      {/* Mostrar transacciones solo si el botón "person-outline" está activo */}
+      {activeIndex === 1 && (
+        <View style={styles.transactionContainer}>
+          <Text style={styles.transactionTitle}>Transaction</Text>
+          {/* Buscador */}
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar transacción..."
+            placeholderTextColor="#B0B0B0"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          <FlatList
+            data={filteredTransactions}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View
+                style={[styles.transactionItem, { borderLeftColor: item.color }]}
+              >
+                <Ionicons
+                  name={item.icon}
+                  size={24}
+                  color={item.color}
+                  style={styles.icon}
+                />
+                <Text style={styles.transactionText}>{item.name}</Text>
+                <Text
+                  style={[
+                    styles.transactionAmount,
+                    { color: item.amount.includes("-") ? "red" : "green" }
+                  ]}
+                >
+                  {item.amount}
+                </Text>
+              </View>
+            )}
+          />
+        </View>
+      )}
+
+      {/* Paginación: Mostrar botones uno debajo del otro */}
       <View style={styles.pagination}>
         <TouchableOpacity
           style={[styles.button, activeIndex === 0 && styles.activeButton]}
@@ -192,31 +211,34 @@ const styles = StyleSheet.create({
     marginVertical: 10
   },
   menuContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "#2A2D3E",
-    borderRadius: 10,
-    padding: 15
-  },
-  extraMenuContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "#2A2D3E",
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 10
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 10
   },
   menuButton: {
     flex: 1,
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2A2D3E",
+    borderRadius: 10,
+    padding: 20,
+    margin: 10,
+    maxWidth: "45%" // Ancho máximo para 2 columnas
   },
-  menuText: { color: "#FFF", fontSize: 14, marginTop: 5 },
+  menuText: { color: "#FFF", fontSize: 14, marginTop: 10 },
   transactionContainer: { flex: 1, marginTop: 10, paddingBottom: 80 },
   transactionTitle: {
     color: "#FFF",
     fontSize: 20,
     fontWeight: "bold",
     marginVertical: 10
+  },
+  searchInput: {
+    backgroundColor: "#2A2D3E",
+    borderRadius: 10,
+    padding: 15,
+    color: "#FFF",
+    marginBottom: 10
   },
   transactionItem: {
     flexDirection: "row",
