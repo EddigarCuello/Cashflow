@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-  TextInput
+  TextInput,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native"; // Importa useNavigation
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { JSONStorageService } from "../Logic/JSON_Storage_Service";
 
 const transactions = [
   {
@@ -50,106 +52,186 @@ const transactions = [
   { id: "7", name: "Bills", amount: "-$800", color: "#E55B42", icon: "receipt" }
 ];
 
-const menuButtons = [
-  {
-    id: "1",
-    name: "Tasa de Interés",
-    icon: "trending-up",
-    onPress: () => navigation.navigate("TasaDeInteres")
-  },
-  {
-    id: "2",
-    name: "I. Simple",
-    icon: "calculator",
-    onPress: () => navigation.navigate("TasaDeInteres")
-  },
-  {
-    id: "3",
-    name: "I. Compuesto",
-    icon: "bar-chart",
-    onPress: () => navigation.navigate("InteresCompuesto")
-  },
-  {
-    id: "4",
-    name: "Anualidades",
-    icon: "calendar",
-    onPress: () => navigation.navigate("Anualidades")
-  }
-];
-
-const HomeScreen = () => {
+const HomeScreen = ({ navigation, route }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const navigation = useNavigation(); // Obtén el objeto de navegación
+  const [balance, setBalance] = useState(0);
+  const [usuarioActual, setUsuarioActual] = useState(null);
+  const [prestamos, setPrestamos] = useState([]);
 
-  // Filtrar transacciones según el texto de búsqueda
-  const filteredTransactions = transactions.filter((transaction) =>
-    transaction.name.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    // Obtener datos del usuario desde los parámetros de navegación
+    if (route.params?.user) {
+      setUsuarioActual(route.params.user);
+      setBalance(route.params.balance);
+    }
+  }, [route.params]);
+
+  const cargarDatosUsuario = async () => {
+    try {
+      const user = await JSONStorageService.getCurrentUser();
+      if (user) {
+        setUsuarioActual(user);
+        const saldo = await JSONStorageService.getUserBalance(user.cedula);
+        setBalance(saldo);
+        
+        // Cargar préstamos del usuario
+        const data = await JSONStorageService.loadData();
+        const userData = data.users.find(u => u.cedula === user.cedula);
+        if (userData && userData.prestamos) {
+          setPrestamos(userData.prestamos);
+        }
+      }
+    } catch (error) {
+      console.error('Error al cargar datos del usuario:', error);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      cargarDatosUsuario();
+    }, [])
+  );
+
+  const menuButtons = [
+    {
+      id: "1",
+      name: "Tasa de Interés",
+      icon: "trending-up",
+      onPress: () => navigation.navigate("TotalInteres", { balance, user: usuarioActual }),
+    },
+    {
+      id: "2",
+      name: "I. Simple",
+      icon: "calculator",
+      onPress: () => navigation.navigate("TasaDeInteres", { balance, user: usuarioActual })
+    },
+    {
+      id: "3",
+      name: "I. Compuesto",
+      icon: "bar-chart",
+      onPress: () => navigation.navigate("InteresCompuesto", { balance, user: usuarioActual })
+    },
+    {
+      id: "4",
+      name: "Anualidades",
+      icon: "calendar",
+      onPress: () => navigation.navigate("Anualidades", { balance, user: usuarioActual })
+    },
+    {
+      id: "5",
+      name: "Gradiente",
+      icon: "trending-up",
+      onPress: () => navigation.navigate("Gradiente", { balance, user: usuarioActual }),
+    },
+    {
+      id: "6",
+      name: "Amortización",
+      icon: "calculator-outline",
+      onPress: () => navigation.navigate("Amortizacion", { balance, user: usuarioActual }),
+    },
+    {
+      id: "7",
+      name: "Capitalización",
+      icon: "account-balance",
+      onPress: () => navigation.navigate("Capitalizacion", { balance, user: usuarioActual }),
+    },
+    {
+      id: "8",
+      name: "TIR",
+      icon: "analytics-outline",
+      onPress: () => navigation.navigate("TIR", { balance, user: usuarioActual }),
+    }
+  ];
+
+  const filteredTransactions = prestamos.filter((prestamo) =>
+    prestamo.tipo.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <View style={styles.container}>
-      {/* Ocultar el header cuando activeIndex es 1 (person-outline) */}
       {activeIndex !== 1 && (
         <View style={styles.header}>
           <Image
             source={require("../assets/fondo.jpg")}
             style={styles.backgroundImage}
           />
+          <Text style={styles.welcomeText}>Bienvenido, {usuarioActual?.nombre || 'Usuario'}</Text>
+          <Text style={styles.balance}>${balance ? balance.toLocaleString() : '0'}</Text>
           <Text style={styles.currency}>COP pesos</Text>
-          <Text style={styles.balance}>$20,000</Text>
+          
+          <TouchableOpacity
+            style={styles.consignarButton}
+            onPress={() => navigation.navigate("Consignar", { 
+              balance, 
+              user: usuarioActual 
+            })}
+          >
+            <Ionicons name="cash-outline" size={24} color="#FFF" />
+            <Text style={styles.consignarButtonText}>Consignar</Text>
+          </TouchableOpacity>
         </View>
       )}
 
-      {/* Ocultar los botones del menú cuando activeIndex es 1 (person-outline) */}
       {activeIndex !== 1 && (
-        <FlatList
-          data={menuButtons}
-          keyExtractor={(item) => item.id}
-          numColumns={2} // Grilla de 2 columnas
-          contentContainerStyle={styles.menuContainer}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.menuButton} onPress={item.onPress}>
-              <Ionicons name={item.icon} size={24} color="#E5A442" />
-              <Text style={styles.menuText}>{item.name}</Text>
-            </TouchableOpacity>
-          )}
-        />
+        <View style={styles.buttonsSection}>
+          <ScrollView>
+            <FlatList
+              data={menuButtons}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              scrollEnabled={false}
+              contentContainerStyle={styles.menuContainer}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.menuButton} onPress={item.onPress}>
+                  <Ionicons name={item.icon} size={24} color="#E5A442" />
+                  <Text style={styles.menuText}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </ScrollView>
+        </View>
       )}
 
-      {/* Mostrar transacciones solo si el botón "person-outline" está activo */}
       {activeIndex === 1 && (
         <View style={styles.transactionContainer}>
-          <Text style={styles.transactionTitle}>Transaction</Text>
-          {/* Buscador */}
+          <Text style={styles.transactionTitle}>Préstamos</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar transacción..."
+            placeholder="Buscar préstamo..."
             placeholderTextColor="#B0B0B0"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           <FlatList
             data={filteredTransactions}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => index.toString()}
+            scrollEnabled={true}
             renderItem={({ item }) => (
               <View
-                style={[styles.transactionItem, { borderLeftColor: item.color }]}
+                style={[styles.transactionItem, { borderLeftColor: '#E5A442' }]}
               >
                 <Ionicons
-                  name={item.icon}
+                  name="cash-outline"
                   size={24}
-                  color={item.color}
+                  color="#E5A442"
                   style={styles.icon}
                 />
-                <Text style={styles.transactionText}>{item.name}</Text>
-                <Text
-                  style={[
-                    styles.transactionAmount,
-                    { color: item.amount.includes("-") ? "red" : "green" }
-                  ]}
-                >
-                  {item.amount}
+                <View style={styles.transactionInfo}>
+                  <Text style={styles.transactionText}>{item.tipo}</Text>
+                  <Text style={styles.transactionDate}>
+                    {new Date(item.fechaCreacion).toLocaleDateString()}
+                  </Text>
+                  <Text style={[styles.transactionStatus, 
+                    item.estado === 'pendiente' ? styles.pendingStatus : 
+                    item.estado === 'aprobado' ? styles.approvedStatus : 
+                    styles.rejectedStatus
+                  ]}>
+                    {item.estado.charAt(0).toUpperCase() + item.estado.slice(1)}
+                  </Text>
+                </View>
+                <Text style={styles.transactionAmount}>
+                  ${item.total ? item.total.toLocaleString() : '0'}
                 </Text>
               </View>
             )}
@@ -157,7 +239,6 @@ const HomeScreen = () => {
         </View>
       )}
 
-      {/* Paginación: Mostrar botones uno debajo del otro */}
       <View style={styles.pagination}>
         <TouchableOpacity
           style={[styles.button, activeIndex === 0 && styles.activeButton]}
@@ -185,7 +266,11 @@ const HomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#1B1D2A", padding: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: "#1B1D2A",
+    padding: 20
+  },
   header: {
     position: "relative",
     height: 250,
@@ -193,7 +278,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 20,
+    marginTop: 40,
+    marginBottom: 40,
     overflow: "hidden"
   },
   backgroundImage: {
@@ -210,10 +296,16 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginVertical: 10
   },
+  buttonsSection: {
+    flex: 1,
+    marginBottom: 100,
+    maxHeight: '50%',
+  },
   menuContainer: {
     flexGrow: 1,
     justifyContent: "center",
-    paddingHorizontal: 10
+    paddingHorizontal: 10,
+    paddingBottom: 20,
   },
   menuButton: {
     flex: 1,
@@ -223,7 +315,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 20,
     margin: 10,
-    maxWidth: "45%" // Ancho máximo para 2 columnas
+    maxWidth: "45%",
+    marginTop: 5
   },
   menuText: { color: "#FFF", fontSize: 14, marginTop: 10 },
   transactionContainer: { flex: 1, marginTop: 10, paddingBottom: 80 },
@@ -252,7 +345,11 @@ const styles = StyleSheet.create({
   },
   icon: { marginRight: 10 },
   transactionText: { color: "#FFF", fontSize: 16, flex: 1 },
-  transactionAmount: { fontSize: 16, fontWeight: "bold" },
+  transactionAmount: { 
+    fontSize: 16, 
+    fontWeight: "bold",
+    color: "#FFF"
+  },
   pagination: {
     flexDirection: "row",
     backgroundColor: "#1B1D2A",
@@ -269,7 +366,57 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.5)"
   },
   button: { padding: 15, borderRadius: 15 },
-  activeButton: { backgroundColor: "#2D5EFF" }
+  activeButton: { backgroundColor: "#2D5EFF" },
+  consignarButton: {
+    flexDirection: 'row',
+    backgroundColor: '#E5A442',
+    borderRadius: 10,
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 15,
+  },
+  consignarButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  welcomeText: {
+    color: '#E5A442',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  transactionInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  transactionDate: {
+    color: '#B0B0B0',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  transactionStatus: {
+    fontSize: 12,
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  pendingStatus: {
+    backgroundColor: '#FFA500',
+    color: '#FFF',
+  },
+  approvedStatus: {
+    backgroundColor: '#4CAF50',
+    color: '#FFF',
+  },
+  rejectedStatus: {
+    backgroundColor: '#F44336',
+    color: '#FFF',
+  },
 });
 
 export default HomeScreen;

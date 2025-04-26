@@ -1,95 +1,146 @@
-import { registerUser } from "../Data/Auth.js";
-import { findUserBy } from "../Data/PersonaData.js";
-import { loginUser, logoutUser , RecoveryPassword} from "../Data/Auth.js";
+import { StorageService } from './Storage_Service';
 
+const USERS_KEY = '@users';
+const CURRENT_USER_KEY = '@current_user';
+const BIOMETRIC_USER_KEY = '@biometric_user';
 
-export const registro = async (Persona) => {
+export const registro = async (userData) => {
   try {
-    const user = await registerUser(Persona);
-    console.log("Usuario registrado:", user);
-  } catch (error) {
-    const errorMessage = error.message || "Error durante el registro";
-    console.error("Error en el registro:", errorMessage);
-  }
-};
-
-export const login = async (email, password) => {
-  try {
-    
-    // Autenticar al usuario
-    const user = await loginUser(email, password);
-    if (!user) {
-      // Si el usuario no existe o las credenciales son incorrectas, lanzar un error o devolver null
-      throw new Error("Credenciales incorrectas");
+    // Verificar si el usuario ya existe
+    const existingUser = await StorageService.findUserByCedula(userData.cedula);
+    if (existingUser) {
+      throw new Error('Usuario ya registrado con esta cédula');
     }
-    
-    // Obtener los datos del usuario por email
-    const userData = await findUserBy("email", email);
-    if (userData) {
-      
-      console.log("Usuario ha iniciado sesión:", user);
-      return userData;
-    } else {
-      console.error("Datos del usuario no encontrados.");
-      return null;
-    }
-  } catch (error) {
-    console.error("Error en el inicio de sesión:", error.message);
-    return null;
-  }
-};
 
-export const loginWithCedula = async (cedula, password) => {
-  try {
-    const UserdData = await findUserBy("cedula",cedula);
-    // Autenticar al usuario
-    const user = await loginUser(UserdData.email, password);
-    if (!user) {
-      // Si el usuario no existe o las credenciales son incorrectas, lanzar un error o devolver null
-      throw new Error("Credenciales incorrectas");
-    }
-    
-    // Obtener los datos del usuario por email
-    const userData = await findUserBy("email", UserdData.email);
-    if (userData) {
-      
-      console.log("Usuario ha iniciado sesión:", user);
-      return userData;
-    } else {
-      console.error("Datos del usuario no encontrados.");
-      return null;
-    }
-  } catch (error) {
-    console.error("Error en el inicio de sesión:", error.message);
-    return null;
-  }
-};
+    // Preparar datos del usuario
+    const newUser = {
+      ...userData,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      hasBiometricEnabled: userData.hasBiometricEnabled || false
+    };
 
-export const emailRecuperacion = async (cedula) => {
-  console.log("llamando a recuperacion de contraseña");
-  try {
-      const userData = await findUserBy("cedula",cedula);
+    // Guardar usuario
+    const userSaved = await StorageService.saveUser(newUser);
+    if (!userSaved) {
+      throw new Error('Error al guardar el usuario');
+    }
 
-      
-      if (userData && userData.email) {
-          await RecoveryPassword(userData.email);
-          console.log("Correo de recuperación enviado a:", userData.email);
-          return "Correo de recuperación enviado con éxito.";
-      } else {
-          console.log("No se encontró un usuario con la cédula proporcionada.");
-          return "No se encontró un usuario con esa cédula.";
+    // Si el usuario habilitó la biometría, guardar credenciales
+    if (userData.hasBiometricEnabled) {
+      const biometricSaved = await StorageService.saveBiometricCredentials({
+        cedula: userData.cedula,
+        password: userData.password
+      });
+      if (!biometricSaved) {
+        throw new Error('Error al guardar credenciales biométricas');
       }
+    }
+
+    return { success: true, message: 'Usuario registrado exitosamente' };
   } catch (error) {
-      console.error("Error en emailRecuperacion:", error.message);
-      return "Hubo un error al procesar la recuperación.";
+    throw new Error(error.message || 'Error al registrar usuario');
   }
+};
+
+export const login = async (cedula, password) => {
+  try {
+    const users = await StorageService.getAllUsers();
+    const user = users.find(u => u.cedula === cedula && u.password === password);
+
+    if (!user) {
+      throw new Error('Credenciales inválidas');
+    }
+
+    // Guardar usuario actual
+    const currentUserSaved = await StorageService.setCurrentUser(user);
+    if (!currentUserSaved) {
+      throw new Error('Error al iniciar sesión');
+    }
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        cedula: user.cedula,
+        isAdmin: user.isAdmin,
+        hasBiometricEnabled: user.hasBiometricEnabled
+      }
+    };
+  } catch (error) {
+    throw new Error(error.message || 'Error al iniciar sesión');
+  }
+};
+
+export const loginWithBiometric = async () => {
+  try {
+    const credentials = await StorageService.getBiometricCredentials();
+    if (!credentials) {
+      throw new Error('No hay credenciales biométricas guardadas');
+    }
+
+    return await login(credentials.cedula, credentials.password);
+  } catch (error) {
+    throw new Error(error.message || 'Error al iniciar sesión con huella dactilar');
+  }
+};
+
+export const getCurrentUser = async () => {
+  return await StorageService.getCurrentUser();
 };
 
 export const logout = async () => {
   try {
-    await logoutUser();
-    console.log("Usuario ha cerrado sesión");
+    const logoutSuccess = await StorageService.removeCurrentUser();
+    if (!logoutSuccess) {
+      throw new Error('Error al cerrar sesión');
+    }
+    return { success: true };
   } catch (error) {
-    console.error("Error en el cierre de sesión:", error.message);
+    throw new Error('Error al cerrar sesión');
+  }
+};
+
+export const hasBiometricCredentials = async () => {
+  const credentials = await StorageService.getBiometricCredentials();
+  return !!credentials;
+};
+
+export const mostrarUsuarios = async () => {
+  try {
+    const users = await StorageService.getAllUsers();
+    console.log('=== USUARIOS REGISTRADOS ===');
+    console.log(JSON.stringify(users, null, 2));
+    console.log('===========================');
+    return users;
+  } catch (error) {
+    console.error('Error al obtener usuarios:', error);
+    return [];
+  }
+};
+
+export const eliminarUsuario = async (cedula) => {
+  try {
+    const deleted = await StorageService.deleteUser(cedula);
+    if (!deleted) {
+      throw new Error('Error al eliminar usuario');
+    }
+    return { success: true, message: 'Usuario eliminado correctamente' };
+  } catch (error) {
+    throw new Error(error.message || 'Error al eliminar usuario');
+  }
+};
+
+export const eliminarTodosLosUsuarios = async () => {
+  try {
+    const deleted = await StorageService.deleteAllUsers();
+    if (!deleted) {
+      throw new Error('Error al eliminar usuarios');
+    }
+    return { success: true, message: 'Todos los usuarios han sido eliminados' };
+  } catch (error) {
+    throw new Error(error.message || 'Error al eliminar usuarios');
   }
 };

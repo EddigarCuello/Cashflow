@@ -76,30 +76,53 @@ t-> tiempo de capitalizacion en años
 tipo -> "VF" para valor futuro, "VA" para valor actual
 t-> variable que contiene losd atos sobre la capitalizacion
 */
+
+// Método de Newton-Raphson para hallar i
+// Método de Newton-Raphson para hallar i
+export const calcularTasaInteres = (A, VF, VA, n, tipo) => {
+    let i = 0.05; // Suposición inicial (5%)
+    const tolerancia = 1e-8; // Precisión deseada
+    const maxIteraciones = 1000; // Número máximo de iteraciones
+
+    for (let iter = 0; iter < maxIteraciones; iter++) {
+        let f, df;
+
+        if (tipo === "VF") {
+            // Fórmula para VF
+            f = A * ((Math.pow(1 + i, n) - 1) / i) - VF;
+            df = (A * n * Math.pow(1 + i, n - 1)) / i - (A * (Math.pow(1 + i, n) - 1)) / (i * i);
+        } else if (tipo === "VA") {
+            // Fórmula para VA
+            f = A * ((1 - Math.pow(1 + i, -n)) / i) - VA;
+            df = (A * n * Math.pow(1 + i, -n - 1)) / i - (A * (1 - Math.pow(1 + i, -n))) / (i * i);
+        } else {
+            return null; // Tipo inválido
+        }
+
+        // Evitar divisiones por cero
+        if (Math.abs(df) < tolerancia) {
+            return null;
+        }
+
+        const iNuevo = i - f / df;
+
+        // Verificar convergencia
+        if (Math.abs(iNuevo - i) < tolerancia) {
+            return iNuevo;
+        }
+
+        i = iNuevo;
+    }
+
+    return null; // No converge después de maxIteraciones
+};
+
+// Método para calcular t cuando i es conocido
 const convertirTiempoAnualidad = (p, unidad) => {
     if (unidad === "y") return p;
     if (unidad === "m") return 12 / p;
     if (unidad === "d") return 365 / p;
     return "Unidad de tiempo inválida";
-};
-
-// Método de Newton-Raphson para hallar i
-const calcularTasaInteres = (A, VF, n) => {
-    let i = 0.05; // Suposición inicial (5%)
-    let tolerancia = 1e-8; // Mayor precisión
-    let maxIteraciones = 100;
-
-    for (let iter = 0; iter < maxIteraciones; iter++) {
-        let f = A * ((Math.pow(1 + i, n) - 1) / i) - VF;
-        let df = A * ((n * Math.pow(1 + i, n - 1) * i - (Math.pow(1 + i, n) - 1)) / (i * i));
-
-        let iNuevo = i - f / df;
-        if (Math.abs(iNuevo - i) < tolerancia) {
-            return iNuevo;
-        }
-        i = iNuevo;
-    }
-    return null; // No converge
 };
 
 // Método para calcular t cuando i es conocido
@@ -136,15 +159,13 @@ export const AnualidadesSimples = async (
 
     // Calcular i si j es nulo
     let i = j !== null ? j / m : null;
-    if (i === null && A !== null && VF !== null && n !== null) {
-        i = calcularTasaInteres(A, VF, n);
-        if (i !== null) return redondear(i, 8);
-        return "No se pudo calcular la tasa de interés.";
-    }
 
     // Calcular t si es nulo
     if (t === null && A !== null && VF !== null && i !== null) {
         t = calcularTiempo(A, VF, i) / m;
+        return redondear(t, 6);
+    } else if (t === null && A !== null && VA !== null && i !== null) {
+        t = (Math.log(1 - (VA * i) / A)) / (-m * Math.log(1 + i));
         return redondear(t, 6);
     }
 
@@ -155,6 +176,8 @@ export const AnualidadesSimples = async (
         resultado = A * ((1 - Math.pow(1 + i, -n)) / i);
     } else if (A === null && VF !== null && i !== null) {
         resultado = VF * (i / (Math.pow(1 + i, n) - 1));
+    } else if (A === null && VA !== null && i !== null) {
+        resultado = (VA * i) / (1 - Math.pow(1 + i, -n));
     }
 
     return redondear(resultado, 6);
@@ -165,9 +188,9 @@ export const AnualidadesSimples = async (
     const resultadoA = await AnualidadesSimples(
         250,   // A (pago periódico)
         0.08,   // j (tasa nominal, a calcular)
-        null,     // t (años)
+        30,     // t (años)
         7,      // p (mensual)
-        1629940.25595,  // VF (valor futuro)
+        null,  // VF (valor futuro)
         null,   // VA
         "VF",   // Tipo de cálculo
         "d"     // unidadTiempo

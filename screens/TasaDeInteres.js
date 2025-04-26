@@ -10,8 +10,9 @@ import {
   Modal
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons"; // Importar íconos
-import { interesSimple } from "../Logic/Calculos";
+import { interesSimple } from "../Logic/InteresSimple"; // Asegúrate de que la ruta sea correcta
 import Svg, { Path, G, Circle } from "react-native-svg"; // Asegúrate de que la ruta sea correcta
+import { JSONStorageService } from "../Logic/JSON_Storage_Service"; // Corregir la ruta de importación
 
 const TasaDeInteres = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -147,7 +148,7 @@ const CalculationSection = () => {
   const [tiempoDias, setTiempoDias] = useState("");
   const [I, setInteres] = useState("");
   const [resultado, setResultado] = useState("");
-  const [modalVisible, setModalVisible] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const toggleSeleccion = opcion => {
     if (seleccionados.includes(opcion)) {
@@ -157,102 +158,58 @@ const CalculationSection = () => {
     }
   };
 
-  const calcularInteresSimple = async () => {
-    // Validar que solo falte un campo
-    const valores = [C, i, tiempoAnos || tiempoMeses || tiempoDias, I];
-    const valoresNulos = valores.filter(v => v === "").length;
-
-    if (valoresNulos !== 1) {
-      Alert.alert("Error", "Debe dejar solo un campo vacío para calcular.");
+  const handleCalcular = async () => {
+    if (!C || !i || (!tiempoAnos && !tiempoMeses && !tiempoDias) || !interes) {
+      Alert.alert("Error", "Por favor, completa todos los campos.");
       return;
     }
-
-    // Inicializar variables
-    let tiempo = {};
-    let unidadTiempo = null;
-
-    // Asignar unidad de tiempo y valores de tiempo sin hacer cálculos
-    if (seleccionados.includes("años")) tiempo.y = parseFloat(tiempoAnos);
-    if (seleccionados.includes("meses")) tiempo.m = parseFloat(tiempoMeses);
-    if (seleccionados.includes("dias")) tiempo.d = parseFloat(tiempoDias);
-
-    // Eliminar valores NaN del objeto tiempo
-    Object.keys(tiempo).forEach(key => {
-      if (isNaN(tiempo[key])) delete tiempo[key];
-    });
-
-    // Asignar la unidad de tiempo
-    if (seleccionados.length === 1) {
-      if (seleccionados.includes("años")) unidadTiempo = "y";
-      else if (seleccionados.includes("meses")) unidadTiempo = "m";
-      else if (seleccionados.includes("dias")) unidadTiempo = "d";
-    } else if (seleccionados.length === 2) {
-      if (seleccionados.includes("años") && seleccionados.includes("meses"))
-        unidadTiempo = "ym";
-      else if (seleccionados.includes("años") && seleccionados.includes("dias"))
-        unidadTiempo = "yd";
-      else if (
-        seleccionados.includes("meses") &&
-        seleccionados.includes("dias")
-      )
-        unidadTiempo = "md";
-    } else if (seleccionados.length === 3) {
-      unidadTiempo = "ymd";
-    } else {
-      Alert.alert("Error", "Selecciona al menos una unidad de tiempo.");
-      return;
-    }
-
-    // Si solo hay una clave en `tiempo`, extraer su valor en lugar de enviarlo como objeto
-    if (Object.keys(tiempo).length === 1) {
-      tiempo = Object.values(tiempo)[0]; // Extrae el único valor
-    } else if (Object.keys(tiempo).length === 0) {
-      tiempo = null; // Si no hay valores, asignar null
-    }
-
-    // Convertir valores de entrada a números válidos o null si no lo son
-    const capital = !isNaN(parseFloat(C)) ? parseFloat(C) : null;
-    const tasaInteres = !isNaN(parseFloat(i)) ? parseFloat(i) : null;
-    const interes = !isNaN(parseFloat(I)) ? parseFloat(I) : null;
-
-    console.log("Llamando a interesSimple con:", {
-      capital,
-      tasaInteres,
-      tiempo,
-      interes,
-      unidadTiempo
-    });
 
     try {
-      const resultadoCalculado = await interesSimple(
-        capital,
-        tasaInteres,
-        tiempo,
-        interes,
-        unidadTiempo
-      );
-      setResultado(resultadoCalculado);
-      setModalVisible(true); // Mostrar el modal con el resultado
+      const capital = parseFloat(C);
+      const tasaInteres = parseFloat(i);
+      const interesTotal = parseFloat(interes);
+      const tiempo = {
+        y: tiempoAnos ? parseInt(tiempoAnos) : 0,
+        m: tiempoMeses ? parseInt(tiempoMeses) : 0,
+        d: tiempoDias ? parseInt(tiempoDias) : 0
+      };
+
+      const montoTotal = capital + interesTotal;
+      setResultado(`Monto Total: ${montoTotal.toLocaleString()} COP`);
+
+      // Guardar el préstamo automáticamente
+      const currentUser = await JSONStorageService.getCurrentUser();
+      if (!currentUser) {
+        Alert.alert("Error", "No hay usuario actual");
+        return;
+      }
+
+      // Crear objeto de préstamo simplificado
+      const loanData = {
+        tipo: "Interés Simple",
+        total: montoTotal,
+        fechaCreacion: new Date().toISOString(),
+        estado: 'por_aprobar'
+      };
+
+      // Guardar el préstamo
+      const saved = await JSONStorageService.saveLoan(currentUser.cedula, loanData);
+      if (saved) {
+        Alert.alert("Éxito", "Préstamo guardado correctamente");
+      } else {
+        Alert.alert("Error", "No se pudo guardar el préstamo");
+      }
+
+      // Limpiar los inputs
+      setC("");
+      setI("");
+      setTiempoAnos("");
+      setTiempoMeses("");
+      setTiempoDias("");
+      setInteres("");
     } catch (error) {
       Alert.alert("Error", "Ocurrió un error en el cálculo.");
     }
-  };
-
-  const handleResponse = response => {
-    setModalVisible(false); // Cerrar el modal
-    if (response === "si") {
-      // Aquí podrías agregar lógica adicional si el usuario acepta el préstamo
-      Alert.alert("Éxito", "Préstamo realizado con éxito.");
-    } else {
-      Alert.alert("Cancelado", "Préstamo cancelado.");
-    }
-    // Limpiar los inputs
-    setC("");
-    setI("");
-    setTiempoAnos("");
-    setTiempoMeses("");
-    setTiempoDias("");
-    setInteres("");
   };
 
   return (
@@ -339,49 +296,30 @@ const CalculationSection = () => {
         onChangeText={setInteres}
       />
 
-      <TouchableOpacity style={styles.boton} onPress={calcularInteresSimple}>
+      <TouchableOpacity style={styles.boton} onPress={handleCalcular}>
         <Text style={styles.textoBoton}>Calcular</Text>
       </TouchableOpacity>
 
-      {/* Modal para mostrar el resultado */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Resultado del cálculo:</Text>
-            <Text style={styles.modalText}>
-              Capital: {C}
-            </Text>
-            <Text style={styles.modalText}>
-              Tasa de interés: {i}
-            </Text>
-            <Text style={styles.modalText}>
-              Resultado: {resultado}
-            </Text>
-            <Text style={styles.modalQuestion}>
-              ¿Quieres realizar el préstamo?
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonYes]}
-                onPress={() => handleResponse("si")}
-              >
-                <Text style={styles.modalButtonText}>Sí</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonNo]}
-                onPress={() => handleResponse("no")}
-              >
-                <Text style={styles.modalButtonText}>No</Text>
-              </TouchableOpacity>
-            </View>
+      {/* Mostrar resultado y botones de confirmación */}
+      {showConfirmation && (
+        <View style={styles.resultContainer}>
+          <Text style={styles.resultText}>Resultado: {resultado}</Text>
+          <View style={styles.confirmationButtons}>
+            <TouchableOpacity
+              style={[styles.confirmationButton, styles.confirmButton]}
+              onPress={() => handleResponse("si")}
+            >
+              <Text style={styles.confirmationButtonText}>Realizar Préstamo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.confirmationButton, styles.cancelButton]}
+              onPress={() => handleResponse("no")}
+            >
+              <Text style={styles.confirmationButtonText}>Cancelar</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      )}
     </View>
   );
 };
@@ -551,64 +489,83 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold"
   },
+  resultContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#2A2D3E',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5A442',
+  },
+  resultText: {
+    color: '#FFF',
+    fontSize: 18,
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  confirmationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 10,
+  },
+  confirmationButton: {
+    padding: 12,
+    borderRadius: 8,
+    width: '45%',
+    alignItems: 'center',
+  },
+  confirmButton: {
+    backgroundColor: '#4CAF50',
+  },
+  cancelButton: {
+    backgroundColor: '#F44336',
+  },
+  confirmationButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   modalContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)"
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: "#1B1D2A",
+    backgroundColor: '#1B1D2A',
+    borderRadius: 20,
     padding: 20,
-    borderRadius: 10,
-    width: "80%",
-    borderWidth: 1,
-    borderColor: "#E5A442",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5
+    width: '80%',
+    alignItems: 'center',
   },
   modalTitle: {
-    color: "#FFD700",
+    color: '#E5A442',
     fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10
+    fontWeight: 'bold',
+    marginBottom: 15,
   },
   modalText: {
-    color: "#FFF",
+    color: '#FFF',
     fontSize: 16,
-    marginBottom: 8
-  },
-  modalQuestion: {
-    color: "#E5A442",
-    fontSize: 18,
-    marginTop: 10,
-    marginBottom: 15,
-    textAlign: "center"
+    marginBottom: 20,
+    textAlign: 'center',
   },
   modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-around"
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   },
   modalButton: {
     padding: 10,
-    borderRadius: 5,
-    width: "40%",
-    alignItems: "center"
-  },
-  modalButtonYes: {
-    backgroundColor: "#4CAF50"
-  },
-  modalButtonNo: {
-    backgroundColor: "#F44336"
+    borderRadius: 10,
+    width: '45%',
+    alignItems: 'center',
   },
   modalButtonText: {
-    color: "#FFF",
+    color: '#FFF',
     fontSize: 16,
-    fontWeight: "bold"
-  }
+    fontWeight: 'bold',
+  },
 });
 
 export default TasaDeInteres;

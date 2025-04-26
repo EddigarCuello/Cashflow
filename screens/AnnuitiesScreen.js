@@ -3,7 +3,8 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert,
 import { Picker } from '@react-native-picker/picker';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // Importar íconos
 import Svg, { Path, G, Rect, Circle } from 'react-native-svg'; // Importar componentes de SVG
-import { AnualidadesSimples } from '../Logic/Calculos';
+import { AnualidadesSimples } from '../Logic/AnualidadesSimples';
+import { JSONStorageService } from '../Logic/JSON_Storage_Service';
 
 const AnnuitiesScreen = () => {
     const [activeTab, setActiveTab] = useState(0);
@@ -124,7 +125,7 @@ const CalculationSection = () => {
     const [tipo, setTipo] = useState('VF');
     const [periodoCapitalizacion, setPeriodoCapitalizacion] = useState('mensual');
     const [result, setResult] = useState(null);
-    const [modalVisible, setModalVisible] = useState(false);
+    const [showConfirmation, setShowConfirmation] = useState(false);
 
     const periodoCapitalizacionOptions = {
         diaria: { p: 1, unidadTiempoPerido: 'd' },
@@ -139,8 +140,7 @@ const CalculationSection = () => {
     };
 
     const calculateAnnuity = async () => {
-        const tiempo = parseFloat(t); // Siempre usamos años
-
+        const tiempo = t === '' ? null : parseFloat(t);
         const ANum = A === '' ? null : parseFloat(A);
         const jNum = j === '' ? null : parseFloat(j);
         const VFNum = VF === '' ? null : parseFloat(VF);
@@ -159,24 +159,60 @@ const CalculationSection = () => {
                 tipo,
                 unidadTiempoPerido
             );
-            setResult(resultadoCalculado);
-            setModalVisible(true); // Mostrar el modal con el resultado
+
+            // Si estamos calculando VF o VA, mostrar opción de préstamo
+            if ((tipo === 'VF' && VF === '') || (tipo === 'VA' && VA === '')) {
+                setResult(`Monto Total: ${resultadoCalculado.toLocaleString()} COP`);
+                setShowConfirmation(true);
+            } else {
+                setResult(`Resultado: ${resultadoCalculado.toLocaleString()} COP`);
+            }
         } catch (error) {
             Alert.alert('Error', error.message);
         }
     };
 
-    const handleResponse = (response) => {
-        setModalVisible(false); // Cerrar el modal
-        if (response === 'si') {
-            // Aquí podrías agregar lógica adicional si el usuario acepta el préstamo
+    const handleResponse = async (response) => {
+        if (response === "si") {
+            try {
+                const currentUser = await JSONStorageService.getCurrentUser();
+                if (!currentUser) {
+                    Alert.alert("Error", "No hay usuario actual");
+                    return;
+                }
+
+                // Extraer el monto total del resultado
+                const montoTotal = parseFloat(result.split('Monto Total: ')[1].replace(' COP', '').replace(/,/g, ''));
+
+                // Crear objeto de préstamo simplificado
+                const loanData = {
+                    tipo: tipo === 'VF' ? "Anualidad Valor Futuro" : "Anualidad Valor Actual",
+                    total: montoTotal,
+                    fechaCreacion: new Date().toISOString(),
+                    estado: 'por_aprobar'
+                };
+
+                // Guardar el préstamo
+                const saved = await JSONStorageService.saveLoan(currentUser.cedula, loanData);
+                if (saved) {
+                    Alert.alert("Éxito", "Préstamo guardado correctamente");
+                } else {
+                    Alert.alert("Error", "No se pudo guardar el préstamo");
+                }
+            } catch (error) {
+                console.error('Error al guardar préstamo:', error);
+                Alert.alert("Error", "Ocurrió un error al guardar el préstamo");
+            }
+        } else {
+            Alert.alert("Cancelado", "Préstamo cancelado.");
         }
-        // Limpiar los inputs
-        setA('');
-        setJ('');
-        setT('');
-        setVF('');
-        setVA('');
+        // Limpiar los inputs y ocultar confirmación
+        setA("");
+        setJ("");
+        setT("");
+        setVF("");
+        setVA("");
+        setShowConfirmation(false);
     };
 
     return (
@@ -233,10 +269,9 @@ const CalculationSection = () => {
                 </Picker>
             </View>
 
-            <Text style={styles.label}>Tiempo en años:</Text>
             <TextInput
                 style={styles.input}
-                placeholder="Tiempo en años"
+                placeholder="Tiempo en años (t)"
                 placeholderTextColor="#BBB"
                 keyboardType="numeric"
                 value={t}
@@ -246,7 +281,7 @@ const CalculationSection = () => {
             {tipo === 'VF' && (
                 <TextInput
                     style={styles.input}
-                    placeholder="Valor futuro (VF)"
+                    placeholder="Valor Futuro (VF)"
                     placeholderTextColor="#BBB"
                     keyboardType="numeric"
                     value={VF}
@@ -257,7 +292,7 @@ const CalculationSection = () => {
             {tipo === 'VA' && (
                 <TextInput
                     style={styles.input}
-                    placeholder="Valor actual (VA)"
+                    placeholder="Valor Actual (VA)"
                     placeholderTextColor="#BBB"
                     keyboardType="numeric"
                     value={VA}
@@ -269,39 +304,28 @@ const CalculationSection = () => {
                 <Text style={styles.buttonText}>Calcular</Text>
             </TouchableOpacity>
 
-            {/* Modal para mostrar el resultado */}
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={modalVisible}
-                onRequestClose={() => setModalVisible(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Resultado del cálculo:</Text>
-                        <Text style={styles.modalText}>Resultado: {result}</Text>
-                        <Text style={styles.modalText}>Préstamo bajo anualidad:</Text>
-                        <Text style={styles.modalText}>Pago periódico: {A}</Text>
-                        <Text style={styles.modalText}>Tasa de interés nominal: {j}</Text>
-                        <Text style={styles.modalText}>Tiempo en años: {t}</Text>
-                        <Text style={styles.modalQuestion}>¿Desea realizar el préstamo?</Text>
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.modalButtonYes]}
-                                onPress={() => handleResponse('si')}
-                            >
-                                <Text style={styles.modalButtonText}>Sí</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.modalButtonNo]}
-                                onPress={() => handleResponse('no')}
-                            >
-                                <Text style={styles.modalButtonText}>No</Text>
-                            </TouchableOpacity>
-                        </View>
+            {result && <Text style={styles.result}>{result}</Text>}
+
+            {/* Mostrar resultado y botones de confirmación */}
+            {showConfirmation && (
+                <View style={styles.resultContainer}>
+                    <Text style={styles.resultText}>{result}</Text>
+                    <View style={styles.confirmationButtons}>
+                        <TouchableOpacity
+                            style={[styles.confirmationButton, styles.confirmButton]}
+                            onPress={() => handleResponse("si")}
+                        >
+                            <Text style={styles.confirmationButtonText}>Realizar Préstamo</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.confirmationButton, styles.cancelButton]}
+                            onPress={() => handleResponse("no")}
+                        >
+                            <Text style={styles.confirmationButtonText}>Cancelar</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
-            </Modal>
+            )}
         </View>
     );
 };
@@ -433,28 +457,42 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
     },
-    modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-    modalContent: {
-        backgroundColor: '#1B1D2A',
-        padding: 20,
+    resultContainer: {
+        marginTop: 20,
+        padding: 15,
+        backgroundColor: '#2A2D3E',
         borderRadius: 10,
-        width: '80%',
         borderWidth: 1,
         borderColor: '#E5A442',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 5,
     },
-    modalTitle: { color: '#FFD700', fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
-    modalText: { color: '#FFF', fontSize: 16, marginBottom: 8 },
-    modalQuestion: { color: '#E5A442', fontSize: 18, marginTop: 10, marginBottom: 15, textAlign: 'center' },
-    modalButtons: { flexDirection: 'row', justifyContent: 'space-around' },
-    modalButton: { padding: 10, borderRadius: 5, width: '40%', alignItems: 'center' },
-    modalButtonYes: { backgroundColor: '#4CAF50' },
-    modalButtonNo: { backgroundColor: '#F44336' },
-    modalButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+    resultText: {
+        color: '#FFF',
+        fontSize: 18,
+        marginBottom: 15,
+        textAlign: 'center',
+    },
+    confirmationButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: 10,
+    },
+    confirmationButton: {
+        padding: 12,
+        borderRadius: 8,
+        width: '45%',
+        alignItems: 'center',
+    },
+    confirmButton: {
+        backgroundColor: '#4CAF50',
+    },
+    cancelButton: {
+        backgroundColor: '#F44336',
+    },
+    confirmationButtonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
     svg: {
         marginVertical: 20,
         alignSelf: 'center',

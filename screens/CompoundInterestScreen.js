@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native'; // Importar íconos
-import Icon from 'react-native-vector-icons/MaterialIcons'; // Importar íconos
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Modal } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import Svg, { Path, G, Rect, Circle } from 'react-native-svg';
-import { interesCompuesto } from '../Logic/Calculos';
+import { interesCompuesto } from '../Logic/InteresCompuesto';
+import { JSONStorageService } from '../Logic/JSON_Storage_Service';
 
 const CompoundInterestScreen = () => {
     const [activeTab, setActiveTab] = useState(0);
+    const [showConfirmation, setShowConfirmation] = useState(false);
 
     // Definir íconos para cada pestaña
     const tabIcons = ['info', 'functions', 'calculate']; // Íconos para Conceptos, Fórmulas y Cálculos
@@ -135,6 +138,8 @@ const CalculationSection = () => {
     const [timeDays, setTimeDays] = useState('');
     const [selectedUnits, setSelectedUnits] = useState([]);
     const [result, setResult] = useState(null);
+    const [showConfirmation, setShowConfirmation] = useState(false);
+    const [frecuenciaCapitalizacion, setFrecuenciaCapitalizacion] = useState('12');
 
     const toggleSelection = (unit) => {
         if (selectedUnits.includes(unit)) {
@@ -142,6 +147,50 @@ const CalculationSection = () => {
         } else {
             setSelectedUnits([...selectedUnits, unit]);
         }
+    };
+
+    const handleResponse = async (response) => {
+        if (response === "si") {
+            try {
+                const currentUser = await JSONStorageService.getCurrentUser();
+                if (!currentUser) {
+                    Alert.alert("Error", "No hay usuario actual");
+                    return;
+                }
+
+                // Extraer el monto total del resultado
+                const montoTotal = parseFloat(result.split('Monto Total: ')[1].replace(' COP', '').replace(/,/g, ''));
+
+                // Crear objeto de préstamo simplificado
+                const loanData = {
+                    tipo: "Interés Compuesto",
+                    total: montoTotal,
+                    fechaCreacion: new Date().toISOString(),
+                    estado: 'por_aprobar'
+                };
+
+                // Guardar el préstamo
+                const saved = await JSONStorageService.saveLoan(currentUser.cedula, loanData);
+                if (saved) {
+                    Alert.alert("Éxito", "Préstamo guardado correctamente");
+                } else {
+                    Alert.alert("Error", "No se pudo guardar el préstamo");
+                }
+            } catch (error) {
+                console.error('Error al guardar préstamo:', error);
+                Alert.alert("Error", "Ocurrió un error al guardar el préstamo");
+            }
+        } else {
+            Alert.alert("Cancelado", "Préstamo cancelado.");
+        }
+        // Limpiar los inputs y ocultar confirmación
+        setC("");
+        setI("");
+        setTimeYears("");
+        setTimeMonths("");
+        setTimeDays("");
+        setM("");
+        setShowConfirmation(false);
     };
 
     const calculateCompoundInterest = async () => {
@@ -189,11 +238,23 @@ const CalculationSection = () => {
         const tasaInteres = !isNaN(parseFloat(i)) ? parseFloat(i) : null;
         const montoFinal = !isNaN(parseFloat(M)) ? parseFloat(M) : null;
 
-        console.log("Llamando a interesCompuesto con:", { capital, tasaInteres, tiempo, montoFinal, unidadTiempo });
-
         try {
-            const calculatedResult = await interesCompuesto(capital, tasaInteres, tiempo, montoFinal, unidadTiempo);
-            setResult(`Monto final: COP ${calculatedResult}`); // Sin redondeo
+            const calculatedResult = await interesCompuesto(
+                capital, 
+                tasaInteres, 
+                tiempo, 
+                montoFinal, 
+                unidadTiempo, 
+                parseInt(frecuenciaCapitalizacion)
+            );
+            
+            if (M === '') {
+                const interes = calculatedResult - capital;
+                setResult(`Interés: ${interes.toLocaleString()} COP\nMonto Total: ${calculatedResult.toLocaleString()} COP`);
+                setShowConfirmation(true);
+            } else {
+                setResult(`Resultado: ${calculatedResult.toLocaleString()} COP`);
+            }
         } catch (error) {
             Alert.alert('Error', 'Ocurrió un error en el cálculo.');
         }
@@ -211,6 +272,25 @@ const CalculationSection = () => {
                 value={i}
                 onChangeText={setI}
             />
+
+            <View style={styles.pickerContainer}>
+                <Text style={styles.pickerLabel}>Frecuencia de Capitalización:</Text>
+                <Picker
+                    selectedValue={frecuenciaCapitalizacion}
+                    onValueChange={(itemValue) => setFrecuenciaCapitalizacion(itemValue)}
+                    style={styles.picker}
+                >
+                    <Picker.Item label="Anual (1 vez al año)" value="1" />
+                    <Picker.Item label="Semestral (2 veces al año)" value="2" />
+                    <Picker.Item label="Cuatrimestral (3 veces al año)" value="3" />
+                    <Picker.Item label="Trimestral (4 veces al año)" value="4" />
+                    <Picker.Item label="Bimestral (6 veces al año)" value="6" />
+                    <Picker.Item label="Mensual (12 veces al año)" value="12" />
+                    <Picker.Item label="Quincenal (24 veces al año)" value="24" />
+                    <Picker.Item label="Semanal (52 veces al año)" value="52" />
+                    <Picker.Item label="Diaria (360 veces al año)" value="360" />
+                </Picker>
+            </View>
 
             <Text style={styles.subtitle}>Selecciona la unidad de tiempo:</Text>
 
@@ -233,13 +313,34 @@ const CalculationSection = () => {
             {selectedUnits.includes("meses") && <TextInput style={styles.input} placeholder="Tiempo en meses" keyboardType="numeric" value={timeMonths} onChangeText={setTimeMonths} />}
             {selectedUnits.includes("dias") && <TextInput style={styles.input} placeholder="Tiempo en días" keyboardType="numeric" value={timeDays} onChangeText={setTimeDays} />}
 
-            <TextInput style={styles.input} placeholder="Monto final (COP)" keyboardType="numeric" onChangeText={setM} value={M} />
+            <TextInput style={styles.input} placeholder="Monto final (M)" keyboardType="numeric" value={M} onChangeText={setM} />
 
             <TouchableOpacity style={styles.button} onPress={calculateCompoundInterest} activeOpacity={0.7}>
                 <Text style={styles.buttonText}>Calcular</Text>
             </TouchableOpacity>
 
             {result && <Text style={styles.result}>{result}</Text>}
+
+            {/* Mostrar resultado y botones de confirmación */}
+            {showConfirmation && (
+                <View style={styles.resultContainer}>
+                    <Text style={styles.resultText}>{result}</Text>
+                    <View style={styles.confirmationButtons}>
+                        <TouchableOpacity
+                            style={[styles.confirmationButton, styles.confirmButton]}
+                            onPress={() => handleResponse("si")}
+                        >
+                            <Text style={styles.confirmationButtonText}>Realizar Préstamo</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.confirmationButton, styles.cancelButton]}
+                            onPress={() => handleResponse("no")}
+                        >
+                            <Text style={styles.confirmationButtonText}>Cancelar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
         </View>
     );
 };
@@ -369,6 +470,63 @@ const styles = StyleSheet.create({
     selectedButton: { backgroundColor: "#FFD700", borderColor: "#FFF" },
     timeButtonText: { color: "#FFF", fontSize: 16, fontWeight: "bold" },
     selectedText: { color: "#1B1D2A" },
+    resultContainer: {
+        marginTop: 20,
+        padding: 15,
+        backgroundColor: '#2A2D3E',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E5A442',
+    },
+    resultText: {
+        color: '#FFF',
+        fontSize: 18,
+        marginBottom: 15,
+        textAlign: 'center',
+    },
+    confirmationButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: 10,
+    },
+    confirmationButton: {
+        padding: 12,
+        borderRadius: 8,
+        width: '45%',
+        alignItems: 'center',
+    },
+    confirmButton: {
+        backgroundColor: '#4CAF50',
+    },
+    cancelButton: {
+        backgroundColor: '#F44336',
+    },
+    confirmationButtonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    pickerContainer: {
+        marginBottom: 15,
+        backgroundColor: '#2A2D3E',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E5A442',
+        overflow: 'hidden',
+    },
+    pickerLabel: {
+        color: '#FFF',
+        padding: 10,
+        fontSize: 16,
+        fontWeight: 'bold',
+        backgroundColor: '#2A2D3E',
+    },
+    picker: {
+        color: '#FFF',
+        height: 50,
+        width: '100%',
+        backgroundColor: '#2A2D3E',
+    },
 });
 
 export default CompoundInterestScreen;
